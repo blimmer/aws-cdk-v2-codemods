@@ -1,0 +1,29 @@
+{
+  "name": "aws-cdk-v2-codemods",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky install"
+  },
+  "keywords": [],
+  "author": "Ben Limmer",
+  "license": "ISC",
+  "dependencies": {
+    "jscodeshift": "^0.13.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^26.0.24",
+    "@types/jscodeshift": "^0.11.2",
+    "husky": "^7.0.1",
+    "jest": "^27.0.6",
+    "lint-staged": "^11.1.2",
+    "prettier": "^2.3.2",
+    "ts-jest": "^27.0.4",
+    "typescript": "^4.3.5"
+  },
+  "lint-staged": {
+    "*.{js,css,md}": "prettier --write"
+  }
+}
