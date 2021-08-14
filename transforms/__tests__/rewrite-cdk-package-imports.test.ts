@@ -1,7 +1,5 @@
-import { defineTest } from "jscodeshift/src/testUtils";
+import { createTestsForTransform } from "./utils";
 
 describe("rewrite cdk package imports", () => {
-  defineTest(__dirname, "./rewrite-cdk-package-imports", {}, "rewrite-cdk-package-imports/cdk-namespace-import", {
-    parser: "ts",
-  });
+  createTestsForTransform("rewrite-cdk-package-imports");
 });
