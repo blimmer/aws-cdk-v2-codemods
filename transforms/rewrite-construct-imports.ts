@@ -16,6 +16,13 @@ export default function transformer(file: FileInfo, api: API) {
   });
 }
 
+/**
+ * This handles named imports, e.g.,
+ *
+ * ```
+ * import { Construct } from '@aws-cdk/core';
+ * ```
+ */
 function handleNamedImport(j: JSCodeshift, root: Collection<any>): boolean {
   const cdkCoreImport = root.find(j.ImportDeclaration, { source: { value: "@aws-cdk/core" } });
   const namedImport = cdkCoreImport.find(j.ImportSpecifier, { imported: { name: "Construct" } });
@@ -23,9 +30,16 @@ function handleNamedImport(j: JSCodeshift, root: Collection<any>): boolean {
     namedImport.remove();
   }
 
-  return !!namedImport.length;
+  return namedImport.length > 0;
 }
 
+/**
+ * This handles namespace imports, e.g.,
+ *
+ * ```
+ * import * as cdk from '@aws-cdk/core';
+ * ```
+ */
 function handleNamespaceImport(j: JSCodeshift, root: Collection<any>): boolean {
   const cdkCoreImport = root.find(j.ImportDeclaration, { source: { value: "@aws-cdk/core" } });
   const namespaceImport = cdkCoreImport.find(j.ImportNamespaceSpecifier);
@@ -42,9 +56,11 @@ function handleNamespaceImport(j: JSCodeshift, root: Collection<any>): boolean {
     cdkConstructUsages.forEach((r) => {
       j(r).replaceWith(j.tsTypeReference(j.identifier("Construct")));
     });
-  }
 
-  return !!namespaceImport.length;
+    return cdkConstructUsages.length > 0;
+  } else {
+    return false;
+  }
 }
 
 function appendConstructsImport(j: JSCodeshift, root: Collection<any>) {
