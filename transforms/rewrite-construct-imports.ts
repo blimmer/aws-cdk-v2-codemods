@@ -5,9 +5,10 @@ export default function transformer(file: FileInfo, api: API) {
   const j = api.jscodeshift;
   const root = j(file.source);
 
-  handleNamedImport(j, root);
-  handleNamespaceImport(j, root);
-  appendConstructsImport(j, root);
+  const didRewrite = [handleNamedImport(j, root), handleNamespaceImport(j, root)].find((r) => r === true);
+  if (didRewrite) {
+    appendConstructsImport(j, root);
+  }
 
   return root.toSource({
     // https://github.com/benjamn/recast/issues/371#issuecomment-565786863
