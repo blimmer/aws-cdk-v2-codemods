@@ -6,6 +6,7 @@ export default function transformer(file: FileInfo, api: API) {
   const root = j(file.source);
 
   handleNamedImport(j, root);
+  handleNamespaceImport(j, root);
   appendConstructsImport(j, root);
 
   return root.toSource({
@@ -22,6 +23,27 @@ function handleNamedImport(j: JSCodeshift, root: Collection<any>): boolean {
   }
 
   return !!namedImport.length;
+}
+
+function handleNamespaceImport(j: JSCodeshift, root: Collection<any>): boolean {
+  const cdkCoreImport = root.find(j.ImportDeclaration, { source: { value: "@aws-cdk/core" } });
+  const namespaceImport = cdkCoreImport.find(j.ImportNamespaceSpecifier);
+
+  if (namespaceImport.length) {
+    const namespaceIdentifier = namespaceImport.find(j.Identifier).get("name").value;
+    const cdkConstructUsages = root.find(j.TSTypeReference).filter((r) => {
+      return (
+        r.get("typeName").get("left").get("name").value === namespaceIdentifier &&
+        r.get("typeName").get("right").get("name").value === "Construct"
+      );
+    });
+
+    cdkConstructUsages.forEach((r) => {
+      j(r).replaceWith(j.tsTypeReference(j.identifier("Construct")));
+    });
+  }
+
+  return !!namespaceImport.length;
 }
 
 function appendConstructsImport(j: JSCodeshift, root: Collection<any>) {
