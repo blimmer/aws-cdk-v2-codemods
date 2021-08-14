@@ -1,7 +1,7 @@
 import { API, FileInfo, JSCodeshift } from "jscodeshift";
 import { Collection } from "jscodeshift/src/Collection";
 
-export default function transformer(file: FileInfo, api: API) {
+export default function transformer(file: FileInfo, api: API): string {
   const j = api.jscodeshift;
   const root = j(file.source);
 
@@ -23,7 +23,7 @@ export default function transformer(file: FileInfo, api: API) {
  * import { Construct } from '@aws-cdk/core';
  * ```
  */
-function handleNamedImport(j: JSCodeshift, root: Collection<any>): boolean {
+function handleNamedImport(j: JSCodeshift, root: Collection<unknown>): boolean {
   const cdkCoreImport = root.find(j.ImportDeclaration, { source: { value: "@aws-cdk/core" } });
   const namedImport = cdkCoreImport.find(j.ImportSpecifier, { imported: { name: "Construct" } });
   if (namedImport.length) {
@@ -40,7 +40,7 @@ function handleNamedImport(j: JSCodeshift, root: Collection<any>): boolean {
  * import * as cdk from '@aws-cdk/core';
  * ```
  */
-function handleNamespaceImport(j: JSCodeshift, root: Collection<any>): boolean {
+function handleNamespaceImport(j: JSCodeshift, root: Collection<unknown>): boolean {
   const cdkCoreImport = root.find(j.ImportDeclaration, { source: { value: "@aws-cdk/core" } });
   const namespaceImport = cdkCoreImport.find(j.ImportNamespaceSpecifier);
 
@@ -63,7 +63,7 @@ function handleNamespaceImport(j: JSCodeshift, root: Collection<any>): boolean {
   }
 }
 
-function appendConstructsImport(j: JSCodeshift, root: Collection<any>) {
+function appendConstructsImport(j: JSCodeshift, root: Collection<unknown>) {
   const importStatements = root.find(j.ImportDeclaration);
   const lastImportStatement = importStatements.at(importStatements.size() - 1);
 
