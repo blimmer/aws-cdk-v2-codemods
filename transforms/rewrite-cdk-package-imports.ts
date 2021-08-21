@@ -1,4 +1,4 @@
-import { API, Collection, FileInfo, ImportDeclaration, JSCodeshift } from "jscodeshift";
+import { API, Collection, FileInfo, ImportSpecifier, JSCodeshift } from "jscodeshift";
 import { snakeCase } from "lodash";
 
 export default function transformer(file: FileInfo, api: API): string {
@@ -23,6 +23,11 @@ function rewriteNamespaceImportStatements(j: JSCodeshift, root: Collection<unkno
   }
 }
 
+interface NamespacePackageImport {
+  namespaceIdentifier: string;
+  cdkLibImportName: string;
+}
+
 function rewriteNamespacePackageImports(j: JSCodeshift, root: Collection<unknown>) {
   const matcher = /^@aws-cdk\/(?<subpackage>aws-.*)$/;
   const cdkSubpackageImports = root.find(j.ImportDeclaration).filter((i) => {
@@ -31,7 +36,7 @@ function rewriteNamespacePackageImports(j: JSCodeshift, root: Collection<unknown
   });
 
   if (cdkSubpackageImports.length) {
-    const subpackages = cdkSubpackageImports.nodes().map((iNode) => {
+    const subpackages: NamespacePackageImport[] = cdkSubpackageImports.nodes().map((iNode) => {
       const i = j(iNode);
       const pkgName: string = i.get("source").get("value").value;
 
@@ -41,20 +46,21 @@ function rewriteNamespacePackageImports(j: JSCodeshift, root: Collection<unknown
       };
     });
 
-    const cdkLibImport = getOrCreateCdkLibImport(j, root);
+    const importStatements = root.find(j.ImportDeclaration);
+    const lastImportStatement = importStatements.at(importStatements.size() - 1);
+    lastImportStatement.insertAfter(
+      j.importDeclaration(namedImportsFromSubpackages(j, subpackages), j.stringLiteral("aws-cdk-lib"))
+    );
+
+    cdkSubpackageImports.remove();
   }
 }
 
-function getOrCreateCdkLibImport(j: JSCodeshift, root: Collection<unknown>): Collection<ImportDeclaration> {
-  // TODO: exclude namespace imports
-  const cdkLibImport = root.find(j.ImportDeclaration, { source: { value: "aws-cdk-lib" } });
-  if (cdkLibImport.length) {
-    return cdkLibImport;
-  } else {
-    const importStatements = root.find(j.ImportDeclaration);
-    const lastImportStatement = importStatements.at(importStatements.size() - 1);
-    lastImportStatement.insertAfter(j.importDeclaration([], j.stringLiteral("aws-cdk-lib")));
-
-    return root.find(j.ImportDeclaration, { source: { value: "aws-cdk-lib" } });
-  }
+function namedImportsFromSubpackages(
+  j: JSCodeshift,
+  namespacePackageImports: NamespacePackageImport[]
+): ImportSpecifier[] {
+  return namespacePackageImports.map((s) => {
+    return j.importSpecifier(j.identifier(s.cdkLibImportName), j.identifier(s.namespaceIdentifier));
+  });
 }
