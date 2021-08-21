@@ -1,16 +1,25 @@
-import { API, Collection, FileInfo, ImportSpecifier, JSCodeshift } from "jscodeshift";
+import { API, Collection, FileInfo, ImportDeclaration, ImportSpecifier, JSCodeshift } from "jscodeshift";
 import { snakeCase } from "lodash";
+
+const SERVICE_MATCHER = /^@aws-cdk\/(?<subpackage>aws-.*)$/;
 
 export default function transformer(file: FileInfo, api: API): string {
   const j = api.jscodeshift;
   const root = j(file.source);
 
-  rewriteNamespaceImportStatements(j, root);
   rewriteNamespacePackageImports(j, root);
+  rewriteNamespaceImportStatements(j, root);
 
   return root.toSource({
     // https://github.com/benjamn/recast/issues/371#issuecomment-565786863
     reuseWhitespace: false,
+  });
+}
+
+function getServiceImports(j: JSCodeshift, root: Collection<unknown>) {
+  return root.find(j.ImportDeclaration).filter((i) => {
+    const pkgName: string = i.get("source").get("value").value;
+    return SERVICE_MATCHER.test(pkgName);
   });
 }
 
@@ -29,34 +38,32 @@ interface NamespacePackageImport {
 }
 
 function rewriteNamespacePackageImports(j: JSCodeshift, root: Collection<unknown>) {
-  const matcher = /^@aws-cdk\/(?<subpackage>aws-.*)$/;
-  const cdkSubpackageImports = root.find(j.ImportDeclaration).filter((i) => {
-    const pkgName: string = i.get("source").get("value").value;
-    const pkgNameMatches = matcher.test(pkgName);
-    const isNamespaceImport = j(i).find(j.ImportNamespaceSpecifier).length > 0;
-
-    return pkgNameMatches && isNamespaceImport;
+  const serviceImports = getServiceImports(j, root);
+  const namespacedServiceImports = serviceImports.filter((si) => {
+    return j(si).find(j.ImportNamespaceSpecifier).length > 0;
   });
 
-  if (cdkSubpackageImports.length) {
-    const subpackages: NamespacePackageImport[] = cdkSubpackageImports.nodes().map((iNode) => {
-      const i = j(iNode);
-      const pkgName: string = i.get("source").get("value").value;
-
-      return {
-        namespaceIdentifier: i.find(j.Identifier).get("name").value,
-        cdkLibImportName: snakeCase(matcher.exec(pkgName)!.groups!["subpackage"]),
-      };
-    });
-
-    const importStatements = root.find(j.ImportDeclaration);
-    const lastImportStatement = importStatements.at(importStatements.size() - 1);
-    lastImportStatement.insertAfter(
-      j.importDeclaration(namedImportsFromSubpackages(j, subpackages), j.stringLiteral("aws-cdk-lib"))
-    );
-
-    cdkSubpackageImports.remove();
+  if (!namespacedServiceImports.length) {
+    return;
   }
+
+  const subpackages: NamespacePackageImport[] = namespacedServiceImports.nodes().map((iNode) => {
+    const i = j(iNode);
+    const pkgName: string = i.get("source").get("value").value;
+
+    return {
+      namespaceIdentifier: i.find(j.Identifier).get("name").value,
+      cdkLibImportName: snakeCase(SERVICE_MATCHER.exec(pkgName)!.groups!["subpackage"]),
+    };
+  });
+
+  const importStatements = root.find(j.ImportDeclaration);
+  const lastImportStatement = importStatements.at(importStatements.size() - 1);
+  lastImportStatement.insertAfter(
+    j.importDeclaration(namedImportsFromSubpackages(j, subpackages), j.stringLiteral("aws-cdk-lib"))
+  );
+
+  namespacedServiceImports.remove();
 }
 
 function namedImportsFromSubpackages(
