@@ -32,7 +32,10 @@ function rewriteNamespacePackageImports(j: JSCodeshift, root: Collection<unknown
   const matcher = /^@aws-cdk\/(?<subpackage>aws-.*)$/;
   const cdkSubpackageImports = root.find(j.ImportDeclaration).filter((i) => {
     const pkgName: string = i.get("source").get("value").value;
-    return matcher.test(pkgName);
+    const pkgNameMatches = matcher.test(pkgName);
+    const isNamespaceImport = j(i).find(j.ImportNamespaceSpecifier).length > 0;
+
+    return pkgNameMatches && isNamespaceImport;
   });
 
   if (cdkSubpackageImports.length) {
