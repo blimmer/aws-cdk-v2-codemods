@@ -1,4 +1,4 @@
-import { API, Collection, FileInfo, ImportDeclaration, ImportSpecifier, JSCodeshift } from "jscodeshift";
+import { API, Collection, FileInfo, ImportSpecifier, JSCodeshift } from "jscodeshift";
 import { snakeCase } from "lodash";
 
 const SERVICE_MATCHER = /^@aws-cdk\/(?<subpackage>aws-.*)$/;
@@ -8,6 +8,8 @@ export default function transformer(file: FileInfo, api: API): string {
   const root = j(file.source);
 
   rewriteNamespacePackageImports(j, root);
+  rewriteNamedPackageImports(j, root);
+
   rewriteNamespaceImportStatements(j, root);
 
   return root.toSource({
@@ -72,5 +74,22 @@ function namedImportsFromSubpackages(
 ): ImportSpecifier[] {
   return namespacePackageImports.map((s) => {
     return j.importSpecifier(j.identifier(s.cdkLibImportName), j.identifier(s.namespaceIdentifier));
+  });
+}
+
+function rewriteNamedPackageImports(j: JSCodeshift, root: Collection<unknown>) {
+  const serviceImports = getServiceImports(j, root);
+  const namedServiceImports = serviceImports.filter((si) => {
+    return j(si).find(j.ImportNamespaceSpecifier).length === 0;
+  });
+
+  if (!namedServiceImports.length) {
+    return;
+  }
+
+  namedServiceImports.forEach((nsi) => {
+    const pkgName = nsi.get("source").get("value").value;
+    const newModuleName = snakeCase(SERVICE_MATCHER.exec(pkgName)!.groups!["subpackage"]);
+    // TODO: figure out how to replace the moduleSpecifier
   });
 }
